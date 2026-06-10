@@ -208,6 +208,35 @@ async function sendInquiryNotification(inquiry) {
       console.error('Failed to send Email notification:', err.message);
     }
   }
+
+  // 3. Send Twilio SMS if API credentials are set
+  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+  const twilioFrom = process.env.TWILIO_FROM_NUMBER;
+  const twilioTo = process.env.TWILIO_TO_NUMBER;
+  if (twilioSid && twilioAuthToken && twilioFrom && twilioTo) {
+    try {
+      const url = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+      const auth = Buffer.from(`${twilioSid}:${twilioAuthToken}`).toString('base64');
+      const bodyParams = new URLSearchParams({
+        From: twilioFrom,
+        To: twilioTo,
+        Body: `🔔 New Aura Cove Stay Inquiry!\n\nGuest: ${name}\nAccommodation: ${eventType}\nDate: ${date || 'N/A'}\nPhone: ${phone || 'N/A'}\nEmail: ${email}`
+      });
+
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: bodyParams.toString()
+      });
+      console.log('Twilio SMS notification sent successfully.');
+    } catch (err) {
+      console.error('Failed to send Twilio SMS:', err.message);
+    }
+  }
 }
 
 // 1. Submit Stay Inquiry from contact form
