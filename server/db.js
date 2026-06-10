@@ -178,7 +178,7 @@ function initializeTables() {
       // Seed default admin user if no users exist
       db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
         if (err) return;
-        if (row && row.count === 0) {
+        if (row && Number(row.count) === 0) {
           const defaultUsername = 'admin';
           const defaultPassword = 'adminpassword123';
           const salt = bcrypt.genSaltSync(10);
@@ -217,7 +217,7 @@ function initializeTables() {
       };
 
       db.get("SELECT COUNT(*) as count FROM settings", [], (err, row) => {
-        if (!err && row && row.count === 0) {
+        if (!err && row && Number(row.count) === 0) {
           const stmt = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
           Object.entries(defaultSettings).forEach(([k, v]) => {
             stmt.run(k, v);
@@ -245,7 +245,7 @@ function initializeTables() {
       )
     `, () => {
       db.get("SELECT COUNT(*) as count FROM services", [], (err, row) => {
-        if (!err && row && row.count === 0) {
+        if (!err && row && Number(row.count) === 0) {
           const defaultServices = [
             {
               name: 'Ayurveda Sanctuary Retreat',
@@ -382,7 +382,7 @@ function initializeTables() {
       )
     `, () => {
       db.get("SELECT COUNT(*) as count FROM projects", [], (err, row) => {
-        if (!err && row && row.count === 0) {
+        if (!err && row && Number(row.count) === 0) {
           const defaultAccommodations = [
             {
               catalog: 'SANCTUARY N°01',
@@ -513,7 +513,7 @@ function initializeTables() {
       )
     `, () => {
       db.get("SELECT COUNT(*) as count FROM testimonials", [], (err, row) => {
-        if (!err && row && row.count === 0) {
+        if (!err && row && Number(row.count) === 0) {
           const defaultTestimonials = [
             {
               client_name: 'Rajesh Kumar',
@@ -608,7 +608,7 @@ function initializeTables() {
       rstmt.finalize();
 
       db.get("SELECT COUNT(*) as count FROM page_content", [], (err, row) => {
-        if (!err && row && row.count === 0) {
+        if (!err && row && Number(row.count) === 0) {
           const defaultPageContent = [
             // Home Page
             { page_id: 'home', section_id: 'hero', element_id: 'title', content_value: 'CURATORS OF BREATHING ROOM' },
