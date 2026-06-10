@@ -254,19 +254,20 @@ export default function Navbar() {
         style={{
           display: 'none', // Overridden in media query
           fontFamily: "var(--sans)",
-          fontSize: '10px',
+          fontSize: '11px',
           fontWeight: 600,
           textTransform: 'uppercase',
-          letterSpacing: '1.5px',
+          letterSpacing: '2px',
           color: 'var(--bg-primary)',
           backgroundColor: 'var(--accent-gold)',
-          padding: '8px 16px',
+          padding: '10px 22px',
           textDecoration: 'none',
-          marginRight: '10px',
+          marginRight: '15px',
           zIndex: 1000,
+          transition: 'all 0.3s ease',
         }}
       >
-        Enquiry
+        Reserve
       </Link>
 
       {/* Mobile Menu Trigger */}
