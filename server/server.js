@@ -139,6 +139,78 @@ function authenticateToken(req, res, next) {
 // --- CLIENT APIS ---
 
 // 1. Submit Stay Inquiry from contact form
+// Helper to send notifications (Telegram & Email) when a new stay inquiry is submitted
+async function sendInquiryNotification(inquiry) {
+  const { name, email, phone, eventType, guestCount, date, details } = inquiry;
+  const messageText = `🔔 *New Aura Cove Stay Inquiry!*\n\n` +
+    `👤 *Name:* ${name}\n` +
+    `📧 *Email:* ${email}\n` +
+    `📞 *Phone:* ${phone || 'N/A'}\n` +
+    `🏡 *Sanctuary:* ${eventType}\n` +
+    `👥 *Guests:* ${guestCount || 'N/A'}\n` +
+    `📅 *Date:* ${date || 'N/A'}\n` +
+    `📝 *Details:* ${details || 'None'}`;
+
+  // 1. Send Telegram Message if bot credentials are set
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+  if (telegramToken && telegramChatId) {
+    try {
+      const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: telegramChatId,
+          text: messageText,
+          parse_mode: 'Markdown'
+        })
+      });
+      console.log('Telegram inquiry notification sent successfully.');
+    } catch (err) {
+      console.error('Failed to send Telegram notification:', err.message);
+    }
+  }
+
+  // 2. Send Resend Email if API credentials are set
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const notificationEmail = process.env.NOTIFICATION_EMAIL;
+  if (resendApiKey && notificationEmail) {
+    try {
+      const htmlContent = `
+        <h2>🔔 New Aura Cove Stay Inquiry!</h2>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
+        <p><strong>Accommodation:</strong> ${eventType}</p>
+        <p><strong>Guests:</strong> ${guestCount || 'N/A'}</p>
+        <p><strong>Proposed Date:</strong> ${date || 'N/A'}</p>
+        <p><strong>Details:</strong> ${details || 'None'}</p>
+        <hr/>
+        <p>Log in to your <a href="${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:5000'}/admin">Admin Dashboard</a> to manage this lead.</p>
+      `;
+      
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'Aura Cove Notifications <onboarding@resend.dev>', // Free tier default sender
+          to: notificationEmail,
+          subject: `🔔 New Aura Cove Inquiry - ${name}`,
+          html: htmlContent
+        })
+      });
+      console.log('Email inquiry notification sent successfully.');
+    } catch (err) {
+      console.error('Failed to send Email notification:', err.message);
+    }
+  }
+}
+
+// 1. Submit Stay Inquiry from contact form
 app.post('/api/inquiries', (req, res) => {
   const { name, email, phone, eventType, guestCount, date, details } = req.body;
   
@@ -158,6 +230,9 @@ app.post('/api/inquiries', (req, res) => {
     }
     
     logActivity('New Inquiry', `Inquiry received from ${name} for ${eventType}.`, 'Client Form');
+    
+    // Trigger notifications in the background
+    sendInquiryNotification({ name, email, phone, eventType, guestCount, date, details });
     
     res.status(201).json({
       message: 'Sanctuary stay inquiry submitted successfully.',
