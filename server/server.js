@@ -252,7 +252,7 @@ app.post('/api/inquiries', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending')
   `;
 
-  db.run(query, [name, email, phone, eventType, guestCount, date, details], function (err) {
+  db.run(query, [name, email, phone, eventType, guestCount, date, details], async function (err) {
     if (err) {
       console.error('Error inserting inquiry:', err.message);
       return res.status(500).json({ error: 'Failed to save stay inquiry.' });
@@ -260,8 +260,8 @@ app.post('/api/inquiries', (req, res) => {
     
     logActivity('New Inquiry', `Inquiry received from ${name} for ${eventType}.`, 'Client Form');
     
-    // Trigger notifications in the background
-    sendInquiryNotification({ name, email, phone, eventType, guestCount, date, details });
+    // Await the notifications so they are sent instantly on serverless platforms before the function responds
+    await sendInquiryNotification({ name, email, phone, eventType, guestCount, date, details });
     
     res.status(201).json({
       message: 'Sanctuary stay inquiry submitted successfully.',
