@@ -602,14 +602,33 @@ function initializeTables() {
         { page_id: 'home', section_id: 'ratings', element_id: 'platform4_score', content_value: '4.5/5' },
         { page_id: 'home', section_id: 'ratings', element_id: 'platform4_text', content_value: '1000+ Reviews' }
       ];
-      const rstmt = db.prepare("INSERT OR IGNORE INTO page_content (page_id, section_id, element_id, content_value) VALUES (?, ?, ?, ?)");
-      ratingsDefaults.forEach(pc => {
-        rstmt.run(pc.page_id, pc.section_id, pc.element_id, pc.content_value);
-      });
-      rstmt.finalize();
+      if (isPostgres) {
+        const placeholders = [];
+        const values = [];
+        let idx = 1;
+        ratingsDefaults.forEach(pc => {
+          placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3})`);
+          values.push(pc.page_id, pc.section_id, pc.element_id, pc.content_value);
+          idx += 4;
+        });
+        const bulkQuery = `
+          INSERT INTO page_content (page_id, section_id, element_id, content_value)
+          VALUES ${placeholders.join(', ')}
+          ON CONFLICT (page_id, section_id, element_id) DO NOTHING
+        `;
+        db.run(bulkQuery, values, (err) => {
+          if (err) console.error('Error seeding ratingsDefaults in bulk:', err.message);
+        });
+      } else {
+        const rstmt = db.prepare("INSERT OR IGNORE INTO page_content (page_id, section_id, element_id, content_value) VALUES (?, ?, ?, ?)");
+        ratingsDefaults.forEach(pc => {
+          rstmt.run(pc.page_id, pc.section_id, pc.element_id, pc.content_value);
+        });
+        rstmt.finalize();
+      }
 
-      db.get("SELECT COUNT(*) as count FROM page_content WHERE page_id = 'home' AND section_id = 'hero' AND element_id = 'title'", [], (err, row) => {
-        if (!err && row && Number(row.count) === 0) {
+      db.get("SELECT COUNT(*) as count FROM page_content", [], (err, row) => {
+        if (!err && row && Number(row.count) < 100) {
           const defaultPageContent = [
             // Home Page
             { page_id: 'home', section_id: 'hero', element_id: 'title', content_value: 'CURATORS OF BREATHING ROOM' },
@@ -762,14 +781,35 @@ function initializeTables() {
             { page_id: 'terms', section_id: 'section4', element_id: 'desc', content_value: 'These terms are governed by and construed in accordance with the local laws of Kerala, India.' },
           ];
 
-          const stmt = db.prepare(`
-            INSERT OR IGNORE INTO page_content (page_id, section_id, element_id, content_value)
-            VALUES (?, ?, ?, ?)
-          `);
-          defaultPageContent.forEach(pc => {
-            stmt.run(pc.page_id, pc.section_id, pc.element_id, pc.content_value);
-          });
-          stmt.finalize();
+          if (isPostgres) {
+            // Bulk insert for PostgreSQL to prevent pool exhaustion and serverless timeouts
+            const placeholders = [];
+            const values = [];
+            let idx = 1;
+            defaultPageContent.forEach(pc => {
+              placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3})`);
+              values.push(pc.page_id, pc.section_id, pc.element_id, pc.content_value);
+              idx += 4;
+            });
+            const bulkQuery = `
+              INSERT INTO page_content (page_id, section_id, element_id, content_value)
+              VALUES ${placeholders.join(', ')}
+              ON CONFLICT (page_id, section_id, element_id) DO UPDATE SET content_value = EXCLUDED.content_value
+            `;
+            db.run(bulkQuery, values, (err) => {
+              if (err) console.error('Error seeding page_content in bulk:', err.message);
+              else console.log('Seeded page_content successfully in bulk.');
+            });
+          } else {
+            const stmt = db.prepare(`
+              INSERT OR IGNORE INTO page_content (page_id, section_id, element_id, content_value)
+              VALUES (?, ?, ?, ?)
+            `);
+            defaultPageContent.forEach(pc => {
+              stmt.run(pc.page_id, pc.section_id, pc.element_id, pc.content_value);
+            });
+            stmt.finalize();
+          }
         }
       });
     });
