@@ -80,3 +80,19 @@ Sends a clean HTML email containing all stay inquiry data.
    * `NOTIFICATION_EMAIL` = `[The email address you want to receive notifications at]`
 4. Redeploy your project. Every new inquiry will send an email summary to your inbox!
 
+### Option C: Twilio SMS Notifications (Trial/Paid Plan)
+Sends standard SMS text messages to a cellular phone number.
+1. Create a free account at [Twilio.com](https://www.twilio.com/).
+2. Navigate to your Twilio console and get:
+   * **Account SID**
+   * **Auth Token**
+   * **Twilio Phone Number** (which you get for free on sign-up)
+3. If using a Twilio trial account, you must verify your client's mobile number under **Verified Caller IDs** in the Twilio console before you can send texts to them.
+4. In your **Vercel Dashboard** → **Project Settings** → **Environment Variables**, add:
+   * `TWILIO_ACCOUNT_SID` = `[Your Twilio Account SID]`
+   * `TWILIO_AUTH_TOKEN` = `[Your Twilio Auth Token]`
+   * `TWILIO_FROM_NUMBER` = `[Your Twilio Phone Number]`
+   * `TWILIO_TO_NUMBER` = `[The client's mobile phone number (with country code, e.g. +91XXXXXXXXXX)]`
+5. Redeploy your project. Every new inquiry will send an SMS alert!
+
+
