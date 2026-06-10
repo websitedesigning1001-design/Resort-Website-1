@@ -53,3 +53,30 @@ Once your build is complete:
    * **Password:** `adminpassword123`
 4. **Important:** Change your password immediately in the **Company Profile** tab of the dashboard to secure the site.
 5. Go to the **Media Library** tab and upload a test image. Once uploaded, verify it appears in the gallery (this checks the serverless memory upload and Base64 database storage).
+
+---
+
+## 🔔 Step 4: Optional - Set Up Instant Mobile Notifications
+You can get instant push notifications sent directly to your phone (via Telegram) or your email inbox every time a guest submits an inquiry.
+
+### Option A: Telegram Push Notifications (100% Free & Instant)
+This acts exactly like a native app alert on your phone.
+1. Download **Telegram** on your phone (if you don't already have it).
+2. Open Telegram and search for `@BotFather`.
+3. Start a chat and type `/newbot`. Follow the steps to name your bot and choose a username.
+4. Copy the **HTTP API Token** (looks like `123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ`).
+5. Next, search for `@userinfobot` on Telegram, start a chat, and copy your **Id** (a 9-10 digit number).
+6. In your **Vercel Dashboard** → **Project Settings** → **Environment Variables**, add:
+   * `TELEGRAM_BOT_TOKEN` = `[Your HTTP API Token]`
+   * `TELEGRAM_CHAT_ID` = `[Your User ID]`
+7. Redeploy your project. Every new inquiry will ping your phone instantly!
+
+### Option B: Resend Email Notifications (3,000 Free Emails/Month)
+Sends a clean HTML email containing all stay inquiry data.
+1. Sign up for a free account at [Resend.com](https://resend.com/).
+2. Create an API Key in your Resend dashboard and copy it.
+3. In your **Vercel Dashboard** → **Project Settings** → **Environment Variables**, add:
+   * `RESEND_API_KEY` = `[Your Resend API Key]`
+   * `NOTIFICATION_EMAIL` = `[The email address you want to receive notifications at]`
+4. Redeploy your project. Every new inquiry will send an email summary to your inbox!
+
