@@ -246,6 +246,29 @@ export default function Navbar() {
         </Link>
       </nav>
 
+      {/* Mobile CTA (visible only on mobile) */}
+      <Link
+        to="/contact"
+        className="mobile-cta-btn"
+        data-cursor="reserve"
+        style={{
+          display: 'none', // Overridden in media query
+          fontFamily: "var(--sans)",
+          fontSize: '10px',
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+          color: 'var(--bg-primary)',
+          backgroundColor: 'var(--accent-gold)',
+          padding: '8px 16px',
+          textDecoration: 'none',
+          marginRight: '10px',
+          zIndex: 1000,
+        }}
+      >
+        Enquiry
+      </Link>
+
       {/* Mobile Menu Trigger */}
       <button
         ref={menuBtnRef}

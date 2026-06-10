@@ -487,6 +487,9 @@ select {
   .mobile-nav-toggle {
     display: flex !important;
   }
+  .mobile-cta-btn {
+    display: inline-block !important;
+  }
   .navbar-header {
     height: 75px !important;
   }
