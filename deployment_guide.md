@@ -1,16 +1,16 @@
-# 🚀 Aura Cove 100% Free Deployment & Hosting Guide
+# 🚀 Aura Cove: 100% Free Serverless Deployment Guide (Vercel + Neon.tech)
 
-This guide details the step-by-step process to deploy the full-stack **Aura Cove** website on **Render** (free application hosting) connected to **Neon.tech** (free PostgreSQL serverless database). 
+This guide details the step-by-step process to deploy the full-stack **Aura Cove** website using **Vercel** (frontend and serverless backend hosting) and **Neon.tech** (serverless PostgreSQL database).
 
-By using Neon instead of Supabase, your database **automatically wakes up** when a user visits and never stays permanently paused. Pinned with a free keep-warm monitor, your Render server will stay active 24/7 without costing a cent!
+This architecture is **completely free, highly secure, and requires no keep-warm pingers**. Because Vercel and Neon are serverless, they boot instantly when a user visits and never stay permanently offline.
 
 ---
 
-## 🏗️ 1. Free Production Architecture
-To keep hosting costs at exactly **$0.00** while keeping the site fast and reliable:
-1. **Frontend + Backend:** Express backend serves compiled React assets statically on **Render (Free Tier)**.
-2. **Database:** Serverless PostgreSQL on **Neon.tech (Free Tier)**. SQLite is only used for local development, while production automatically shifts to Neon when `DATABASE_URL` is configured.
-3. **Uptime Keeping:** A free pinging service (like UptimeRobot) pings the site every 14 minutes to prevent Render's free instance from sleeping.
+## 🏗️ 1. Serverless Architecture
+* **Frontend:** Hosted on Vercel's global CDN (always fast, never sleeps, 100% free).
+* **Backend:** Express routes are served as Vercel Serverless Functions.
+* **Database:** Serverless PostgreSQL on Neon.tech. 
+* **Media Uploads:** In serverless mode, images uploaded by the admin are compressed to WebP/JPEG using `sharp` in-memory and stored directly inside Neon PostgreSQL as Base64 strings. This removes the need for file system write permissions or external file storage (like S3/Cloudinary), making the site completely self-contained and 100% free!
 
 ---
 
@@ -27,46 +27,29 @@ Neon offers a serverless PostgreSQL database that auto-resumes instantly and doe
 
 ---
 
-## ☁️ Step 2: Deploy Backend + Frontend on Render.com
-Render will pull your code from GitHub, run the production build, and host the Express server.
+## ☁️ Step 2: Deploy to Vercel
+Vercel will build your static Vite frontend and package your Express backend routes as Serverless Functions automatically using the project's root `vercel.json`.
 
-1. Create a free account on [Render.com](https://render.com/).
-2. Click **New** → **Web Service**.
-3. Connect your GitHub repository containing the Aura Cove code.
-4. Configure the **Build Settings**:
-   * **Name:** `aura-cove`
-   * **Region:** Same region as your Neon database.
-   * **Branch:** `main` (or `master`)
-   * **Runtime:** `Node`
-   * **Build Command:** `npm run build:prod`
-   * **Start Command:** `npm run start:prod`
-   * **Instance Type:** `Free`
-5. Click **Advanced** to add **Environment Variables**:
-   * `NODE_ENV` = `production`
-   * `JWT_SECRET` = `[Input a long, random secure string]`
-   * `DATABASE_URL` = `[Paste your Neon.tech Connection String copied in Step 1]`
-6. Click **Create Web Service**. Render will install dependencies, compile the React build, and boot the server.
+1. Sign up for a free account at [Vercel.com](https://vercel.com/).
+2. Click **Add New** → **Project**.
+3. Import your GitHub repository containing the Aura Cove code.
+4. In the configuration settings:
+   * **Framework Preset:** `Vite` (Vercel auto-detects this)
+   * **Root Directory:** `./`
+   * **Build and Output Settings:** Leave as default (Vercel runs `npm run build` and serves the `dist` folder).
+5. Expand the **Environment Variables** tab and add:
+   * `DATABASE_URL` = `[Paste your Neon.tech Connection String from Step 1]`
+   * `JWT_SECRET` = `[Input a long, random secure string (e.g. aura_cove_secret_2026)]`
+6. Click **Deploy**. Vercel will build and launch your website.
 
 ---
 
-## ⏰ Step 3: Keep the Website Warm (Prevent Sleeping)
-Render's free tier spins down (sleeps) after 15 minutes of inactivity, causing the next visitor to experience a 50-second delay. You can bypass this sleep cycle for free:
-
-1. Sign up for a free account at [UptimeRobot](https://uptimerobot.com/) or [cron-job.org](https://cron-job.org/).
-2. Create a new **HTTP Monitor** / **Cron Job**:
-   * **Friendly Name:** `Aura Cove Keep-Warm`
-   * **URL:** `https://your-aura-cove-subdomain.onrender.com`
-   * **Interval:** Every **14 minutes** (Render sleeps at 15 minutes, so 14 keeps it awake).
-3. Save the monitor. This will ping your website automatically, keeping it active and fast 24/7 at no cost.
-
----
-
-## 🛡️ Step 4: Verification Checklist
+## 🛡️ Step 3: Verification Checklist
 Once your build is complete:
-1. Navigate to your custom Render URL (e.g., `https://aura-cove.onrender.com`).
-2. Verify the website loads, smooth scrolling flows correctly, and all pages (Heritage, Experiences, Rooms) render.
+1. Navigate to your custom Vercel URL (e.g., `https://aura-cove.vercel.app`).
+2. Verify all pages (Heritage, Experiences, Rooms, Contact) load instantly.
 3. Go to `/admin` and log in using the default admin credentials:
    * **Username:** `admin`
    * **Password:** `adminpassword123`
 4. **Important:** Change your password immediately in the **Company Profile** tab of the dashboard to secure the site.
-5. Inquiries and changes to CMS text will now persist indefinitely in Neon's database, even when deployments update!
+5. Go to the **Media Library** tab and upload a test image. Once uploaded, verify it appears in the gallery (this checks the serverless memory upload and Base64 database storage).

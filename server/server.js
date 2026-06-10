@@ -18,10 +18,15 @@ dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const uploadsDir = join(__dirname, 'uploads');
+const isPostgres = !!process.env.DATABASE_URL;
 
-// Ensure uploads folder exists
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
+// Ensure uploads folder exists (skip/catch error if directory is read-only in serverless environments)
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir);
+  }
+} catch (err) {
+  console.warn('Could not create uploads directory (running in a read-only serverless environment):', err.message);
 }
 
 const app = express();
@@ -82,17 +87,20 @@ function logActivity(action, details, user) {
   });
 }
 
-// Multer Storage Configuration
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, uniqueSuffix + ext);
-  }
-});
+// Multer Storage Configuration (use MemoryStorage in PostgreSQL/production serverless mode)
+const storage = isPostgres
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, uploadsDir);
+      },
+      filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = path.extname(file.originalname);
+        cb(null, uniqueSuffix + ext);
+      }
+    });
+
 const upload = multer({ 
   storage: storage,
   limits: {
@@ -429,44 +437,76 @@ app.post('/api/media/upload', authenticateToken, upload.single('file'), async (r
   if (!req.file) return res.status(400).json({ error: 'No file was uploaded.' });
   
   const category = req.body.category || 'general';
+  let filepath;
+  let size = req.file.size;
   
-  // Optimize image files
-  if (req.file.mimetype.startsWith('image/')) {
+  if (isPostgres) {
+    // Serverless mode: Optimize image in memory using Sharp and save as base64 string directly in database
     try {
-      const originalPath = req.file.path;
-      const tempPath = originalPath + '-opt';
+      let imageBuffer = req.file.buffer;
       
-      let pipeline = sharp(originalPath)
-        .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true });
-      
-      if (req.file.mimetype === 'image/png') {
-        pipeline = pipeline.png({ quality: 80, compressionLevel: 9 });
-      } else if (req.file.mimetype === 'image/webp') {
-        pipeline = pipeline.webp({ quality: 80 });
-      } else {
-        pipeline = pipeline.jpeg({ quality: 82, progressive: true });
+      if (req.file.mimetype.startsWith('image/')) {
+        let pipeline = sharp(imageBuffer)
+          .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true });
+        
+        if (req.file.mimetype === 'image/png') {
+          pipeline = pipeline.png({ quality: 75, compressionLevel: 8 });
+        } else if (req.file.mimetype === 'image/webp') {
+          pipeline = pipeline.webp({ quality: 75 });
+        } else {
+          pipeline = pipeline.jpeg({ quality: 75, progressive: true });
+        }
+        
+        imageBuffer = await pipeline.toBuffer();
+        size = imageBuffer.length;
       }
       
-      await pipeline.toFile(tempPath);
-      
-      // Replace original file with compressed one
-      fs.unlinkSync(originalPath);
-      fs.renameSync(tempPath, originalPath);
-      
-      // Update file size metadata
-      const stats = fs.statSync(originalPath);
-      req.file.size = stats.size;
+      const base64Data = imageBuffer.toString('base64');
+      filepath = `data:${req.file.mimetype};base64,${base64Data}`;
     } catch (err) {
-      console.error('Sharp image optimization failed, using original file:', err);
+      console.error('Sharp in-memory image optimization failed, using original file buffer:', err);
+      const base64Data = req.file.buffer.toString('base64');
+      filepath = `data:${req.file.mimetype};base64,${base64Data}`;
     }
+  } else {
+    // Local SQLite mode: Save file to local uploads directory
+    if (req.file.mimetype.startsWith('image/')) {
+      try {
+        const originalPath = req.file.path;
+        const tempPath = originalPath + '-opt';
+        
+        let pipeline = sharp(originalPath)
+          .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true });
+        
+        if (req.file.mimetype === 'image/png') {
+          pipeline = pipeline.png({ quality: 80, compressionLevel: 9 });
+        } else if (req.file.mimetype === 'image/webp') {
+          pipeline = pipeline.webp({ quality: 80 });
+        } else {
+          pipeline = pipeline.jpeg({ quality: 82, progressive: true });
+        }
+        
+        await pipeline.toFile(tempPath);
+        
+        // Replace original file with compressed one
+        fs.unlinkSync(originalPath);
+        fs.renameSync(tempPath, originalPath);
+        
+        // Update file size metadata
+        const stats = fs.statSync(originalPath);
+        size = stats.size;
+      } catch (err) {
+        console.error('Sharp image optimization failed, using original file:', err);
+      }
+    }
+    filepath = `/uploads/${req.file.filename}`;
   }
 
-  const filepath = `/uploads/${req.file.filename}`;
   const query = `
     INSERT INTO media (filename, filepath, mimetype, size, category)
     VALUES (?, ?, ?, ?, ?)
   `;
-  db.run(query, [req.file.originalname, filepath, req.file.mimetype, req.file.size, category], function (err) {
+  db.run(query, [req.file.originalname, filepath, req.file.mimetype, size, category], function (err) {
     if (err) return res.status(500).json({ error: err.message });
     logActivity('Media Upload', `Uploaded image: ${req.file.originalname}`, req.user.username);
     res.status(201).json({
@@ -484,16 +524,26 @@ app.delete('/api/media/:id', authenticateToken, (req, res) => {
   db.get(`SELECT * FROM media WHERE id = ?`, [id], (err, row) => {
     if (err || !row) return res.status(404).json({ error: 'Media not found.' });
     
-    const filepathOnDisk = join(__dirname, row.filepath.replace('/uploads/', 'uploads/'));
-    fs.unlink(filepathOnDisk, (unlinkErr) => {
-      if (unlinkErr) console.warn('Could not delete file from disk:', unlinkErr.message);
-      
+    if (isPostgres) {
+      // Serverless: No local file to unlink
       db.run(`DELETE FROM media WHERE id = ?`, [id], function (delErr) {
         if (delErr) return res.status(500).json({ error: delErr.message });
         logActivity('Media Delete', `Deleted media file: ${row.filename}`, req.user.username);
         res.json({ message: 'Media file deleted successfully.' });
       });
-    });
+    } else {
+      // Local: Delete file from local disk
+      const filepathOnDisk = join(__dirname, row.filepath.replace('/uploads/', 'uploads/'));
+      fs.unlink(filepathOnDisk, (unlinkErr) => {
+        if (unlinkErr) console.warn('Could not delete file from disk:', unlinkErr.message);
+        
+        db.run(`DELETE FROM media WHERE id = ?`, [id], function (delErr) {
+          if (delErr) return res.status(500).json({ error: delErr.message });
+          logActivity('Media Delete', `Deleted media file: ${row.filename}`, req.user.username);
+          res.json({ message: 'Media file deleted successfully.' });
+        });
+      });
+    }
   });
 });
 
@@ -740,6 +790,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'An unexpected server error occurred.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Aura Cove luxury backend running on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Aura Cove luxury backend running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
