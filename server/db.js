@@ -1,19 +1,136 @@
 import sqlite3 from 'sqlite3';
+import pkg from 'pg';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 
+const { Pool } = pkg;
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(__dirname, 'database.sqlite');
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('Connected to SQLite database at:', dbPath);
+const isPostgres = !!process.env.DATABASE_URL;
+let db;
+
+if (isPostgres) {
+  console.log('Using PostgreSQL database client (Neon/Supabase)...');
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  // Query translation helper to run SQLite-style queries on PostgreSQL
+  const translateQuery = (sql) => {
+    let query = sql;
+    
+    // 1. Replace SQLite auto-increment syntax
+    query = query.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/gi, 'SERIAL PRIMARY KEY');
+    
+    // 2. Replace SQLite DATETIME with PostgreSQL TIMESTAMP
+    query = query.replace(/\bDATETIME\b/gi, 'TIMESTAMP');
+    
+    // 3. Replace INSERT OR REPLACE / INSERT OR IGNORE with PostgreSQL upserts
+    if (query.toUpperCase().includes('INSERT OR REPLACE INTO SETTINGS')) {
+      query = `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
+    } else if (query.toUpperCase().includes('INSERT OR REPLACE INTO PAGE_CONTENT')) {
+      query = `INSERT INTO page_content (page_id, section_id, element_id, content_value) VALUES ($1, $2, $3, $4) ON CONFLICT (page_id, section_id, element_id) DO UPDATE SET content_value = EXCLUDED.content_value`;
+    } else if (query.toUpperCase().includes('INSERT OR IGNORE INTO PAGE_CONTENT')) {
+      query = `INSERT INTO page_content (page_id, section_id, element_id, content_value) VALUES ($1, $2, $3, $4) ON CONFLICT (page_id, section_id, element_id) DO NOTHING`;
+    }
+    
+    // 4. Replace SQLite placeholder ? with PostgreSQL placeholder $1, $2, $3...
+    let paramCounter = 0;
+    query = query.replace(/\?/g, () => `$${++paramCounter}`);
+    
+    // 5. Append RETURNING id for non-conflict INSERT queries to mimic SQLite's lastID behavior
+    if (query.trim().toUpperCase().startsWith('INSERT INTO ') && !query.toUpperCase().includes('RETURNING')) {
+      if (!query.toUpperCase().includes('INTO SETTINGS') && !query.toUpperCase().includes('INTO PAGE_CONTENT')) {
+        query += ' RETURNING id';
+      }
+    }
+    
+    return query;
+  };
+
+  db = {
+    all(sql, params, cb) {
+      if (typeof params === 'function') {
+        cb = params;
+        params = [];
+      }
+      const pgSql = translateQuery(sql);
+      pool.query(pgSql, params, (err, res) => {
+        if (cb) cb(err, res ? res.rows : null);
+      });
+    },
+    
+    get(sql, params, cb) {
+      if (typeof params === 'function') {
+        cb = params;
+        params = [];
+      }
+      const pgSql = translateQuery(sql);
+      pool.query(pgSql, params, (err, res) => {
+        if (cb) cb(err, res && res.rows.length > 0 ? res.rows[0] : null);
+      });
+    },
+    
+    run(sql, params, cb) {
+      if (typeof params === 'function') {
+        cb = params;
+        params = [];
+      }
+      const pgSql = translateQuery(sql);
+      pool.query(pgSql, params, function (err, res) {
+        const context = {
+          lastID: res && res.rows && res.rows[0] ? res.rows[0].id : 0,
+          changes: res ? res.rowCount : 0
+        };
+        if (cb) cb.call(context, err);
+      });
+    },
+    
+    serialize(cb) {
+      cb();
+    },
+    
+    prepare(sql) {
+      const pgSql = translateQuery(sql);
+      return {
+        run(params, cb) {
+          if (typeof params === 'function') {
+            cb = params;
+            params = [];
+          }
+          pool.query(pgSql, params, function (err, res) {
+            const context = {
+              lastID: res && res.rows && res.rows[0] ? res.rows[0].id : 0,
+              changes: res ? res.rowCount : 0
+            };
+            if (cb) cb.call(context, err);
+          });
+        },
+        finalize(cb) {
+          if (cb) cb();
+        }
+      };
+    }
+  };
+  
+  setTimeout(() => {
     initializeTables();
-  }
-});
+  }, 0);
+} else {
+  console.log('Using SQLite local database...');
+  const dbPath = join(__dirname, 'database.sqlite');
+  const sqliteDb = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+      console.error('Error opening database:', err.message);
+    } else {
+      console.log('Connected to SQLite database at:', dbPath);
+      initializeTables();
+    }
+  });
+  db = sqliteDb;
+}
 
 function initializeTables() {
   db.serialize(() => {

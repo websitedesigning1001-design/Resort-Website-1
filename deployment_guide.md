@@ -1,98 +1,72 @@
-# 🚀 Aura Cove Deployment & Hosting Guide
+# 🚀 Aura Cove 100% Free Deployment & Hosting Guide
 
-This guide details the step-by-step process to deploy the full-stack **Aura Cove** website on **Render** or **Railway**. 
+This guide details the step-by-step process to deploy the full-stack **Aura Cove** website on **Render** (free application hosting) connected to **Neon.tech** (free PostgreSQL serverless database). 
 
----
-
-## 🏗️ 1. Unified Deployment Architecture
-To keep hosting costs at zero (or minimal) and completely eliminate CORS conflicts, the application has been optimized to run as a **single, unified service**:
-1. During the build phase, the React frontend is compiled into static assets inside the `dist` directory.
-2. The Express backend is configured to statically serve the compiled React app.
-3. Any route that does not start with `/api` or `/uploads` is caught and redirected to `dist/index.html` (enabling smooth client-side React Router navigation).
-4. SQLite is used as a lightweight database. Since SQLite is file-based, a **Persistent Volume (Disk)** must be attached to the service to prevent database resets and keep uploaded images safe when the server restarts.
+By using Neon instead of Supabase, your database **automatically wakes up** when a user visits and never stays permanently paused. Pinned with a free keep-warm monitor, your Render server will stay active 24/7 without costing a cent!
 
 ---
 
-## 🛠️ 2. Deployment Settings Overview
-For both platforms, use the following root project settings:
-
-* **Build Command:** `npm run build:prod` (Installs frontend deps, compiles assets, and installs backend deps).
-* **Start Command:** `npm run start:prod` (Launches the Express production server on the allocated port).
-* **Environment Variables:**
-  * `NODE_ENV`: `production`
-  * `JWT_SECRET`: A long, random string (e.g., `aura_cove_super_secure_production_key_2026`)
-  * `PORT`: `5000` (or automatically set by the hosting provider)
+## 🏗️ 1. Free Production Architecture
+To keep hosting costs at exactly **$0.00** while keeping the site fast and reliable:
+1. **Frontend + Backend:** Express backend serves compiled React assets statically on **Render (Free Tier)**.
+2. **Database:** Serverless PostgreSQL on **Neon.tech (Free Tier)**. SQLite is only used for local development, while production automatically shifts to Neon when `DATABASE_URL` is configured.
+3. **Uptime Keeping:** A free pinging service (like UptimeRobot) pings the site every 14 minutes to prevent Render's free instance from sleeping.
 
 ---
 
-## 🚂 Option A: Deploying on Railway (Recommended)
-Railway is the fastest and most stable platform for full-stack Node.js + SQLite apps.
+## 💾 Step 1: Create a Free Database on Neon.tech
+Neon offers a serverless PostgreSQL database that auto-resumes instantly and does not require a credit card.
 
-### Step 1: Create a Railway Account & Connect GitHub
-1. Sign up on [Railway.app](https://railway.app/).
-2. Click **New Project** -> **Deploy from GitHub repo**.
-3. Select the repository containing your website code.
+1. Go to [Neon.tech](https://neon.tech/) and sign up for a free account.
+2. Click **Create Project**:
+   * **Project Name:** `auracove-db`
+   * **Database Version:** PostgreSQL 16 (default)
+   * **Region:** Choose the region closest to your clients.
+3. Once created, copy the **Connection String** from the dashboard. It will look like this:
+   `postgresql://neondb_owner:xxxxxx@ep-xxxxxx.region.pooler.neon.tech/neondb?sslmode=require`
 
-### Step 2: Configure variables
-1. In the service settings, go to the **Variables** tab.
-2. Add the following variables:
+---
+
+## ☁️ Step 2: Deploy Backend + Frontend on Render.com
+Render will pull your code from GitHub, run the production build, and host the Express server.
+
+1. Create a free account on [Render.com](https://render.com/).
+2. Click **New** → **Web Service**.
+3. Connect your GitHub repository containing the Aura Cove code.
+4. Configure the **Build Settings**:
+   * **Name:** `aura-cove`
+   * **Region:** Same region as your Neon database.
+   * **Branch:** `main` (or `master`)
+   * **Runtime:** `Node`
+   * **Build Command:** `npm run build:prod`
+   * **Start Command:** `npm run start:prod`
+   * **Instance Type:** `Free`
+5. Click **Advanced** to add **Environment Variables**:
    * `NODE_ENV` = `production`
-   * `JWT_SECRET` = `[Choose a secure random key]`
-   * `PORT` = `5000`
-
-### Step 3: Add a Persistent Volume (Disk) for Database & Uploads
-*Since SQLite is a file-based database, Railway's ephemeral container resets on every deployment. You must mount a persistent disk to retain your database and uploaded images.*
-
-1. In your Railway service dashboard, click **Settings**.
-2. Scroll down to **Volumes** and click **Add Volume**.
-3. Create a volume:
-   * **Name:** `auracove-storage`
-   * **Mount Path:** `/app/server/uploads` (This maps to the image uploads directory)
-   * **Size:** `1GB` to `5GB` (usually free or cheap)
-4. Repeat to create a second volume for the database file:
-   * **Name:** `auracove-db`
-   * **Mount Path:** `/app/server/database.sqlite` (or mount a volume on `/app/server` to cover both database and uploads in one disk).
+   * `JWT_SECRET` = `[Input a long, random secure string]`
+   * `DATABASE_URL` = `[Paste your Neon.tech Connection String copied in Step 1]`
+6. Click **Create Web Service**. Render will install dependencies, compile the React build, and boot the server.
 
 ---
 
-## ☁️ Option B: Deploying on Render
-Render is a popular free-tier hosting alternative.
+## ⏰ Step 3: Keep the Website Warm (Prevent Sleeping)
+Render's free tier spins down (sleeps) after 15 minutes of inactivity, causing the next visitor to experience a 50-second delay. You can bypass this sleep cycle for free:
 
-### Step 1: Create a Web Service
-1. Log in to [Render.com](https://render.com/).
-2. Click **New** -> **Web Service**.
-3. Connect your GitHub repository.
-
-### Step 2: Configure Build Settings
-* **Runtime:** `Node`
-* **Region:** Choose the region closest to your users.
-* **Branch:** `main` (or your active dev branch)
-* **Build Command:** `npm run build:prod`
-* **Start Command:** `npm run start:prod`
-* **Plan:** Free or Starter
-
-### Step 3: Add Environment Variables
-1. Go to the **Environment** tab.
-2. Add the following variables:
-   * `NODE_ENV` = `production`
-   * `JWT_SECRET` = `[Your secure random key]`
-
-### Step 4: Add Persistent Disk Mount
-1. Go to the **Disks** tab.
-2. Click **Add Disk**.
-3. Configure the disk settings:
-   * **Name:** `uploads-disk`
-   * **Mount Path:** `/opt/render/project/src/server/uploads` (This is the absolute path to the server uploads folder on Render)
-   * **Size:** `1GB` (Render free tier includes 1GB disk space)
+1. Sign up for a free account at [UptimeRobot](https://uptimerobot.com/) or [cron-job.org](https://cron-job.org/).
+2. Create a new **HTTP Monitor** / **Cron Job**:
+   * **Friendly Name:** `Aura Cove Keep-Warm`
+   * **URL:** `https://your-aura-cove-subdomain.onrender.com`
+   * **Interval:** Every **14 minutes** (Render sleeps at 15 minutes, so 14 keeps it awake).
+3. Save the monitor. This will ping your website automatically, keeping it active and fast 24/7 at no cost.
 
 ---
 
-## 🛡️ 3. Verification Checklist
-Once your build is complete and the service is running:
-1. Navigate to your custom domain or the provider URL (e.g. `https://your-app.up.railway.app` or `https://your-app.onrender.com`).
+## 🛡️ Step 4: Verification Checklist
+Once your build is complete:
+1. Navigate to your custom Render URL (e.g., `https://aura-cove.onrender.com`).
 2. Verify the website loads, smooth scrolling flows correctly, and all pages (Heritage, Experiences, Rooms) render.
-3. Go to `/admin` and log in using:
+3. Go to `/admin` and log in using the default admin credentials:
    * **Username:** `admin`
    * **Password:** `adminpassword123`
-4. Change your password immediately in the **Company Profile** tab to secure your panel.
-5. Upload a test image in the **Media Library** tab to verify that the persistent uploads disk is mounting and writing correctly.
+4. **Important:** Change your password immediately in the **Company Profile** tab of the dashboard to secure the site.
+5. Inquiries and changes to CMS text will now persist indefinitely in Neon's database, even when deployments update!
