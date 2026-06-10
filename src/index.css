@@ -484,6 +484,9 @@ select {
   .desktop-nav {
     display: none !important;
   }
+  .mobile-nav-controls {
+    display: flex !important;
+  }
   .mobile-nav-toggle {
     display: flex !important;
   }

@@ -246,48 +246,56 @@ export default function Navbar() {
         </Link>
       </nav>
 
-      {/* Mobile CTA (visible only on mobile) */}
-      <Link
-        to="/contact"
-        className="mobile-cta-btn"
-        data-cursor="reserve"
+      {/* Mobile Controls Container (grouped for perfect right alignment next to hamburger) */}
+      <div
+        className="mobile-nav-controls"
         style={{
           display: 'none', // Overridden in media query
-          fontFamily: "var(--sans)",
-          fontSize: '11px',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '2px',
-          color: 'var(--bg-primary)',
-          backgroundColor: 'var(--accent-gold)',
-          padding: '10px 22px',
-          textDecoration: 'none',
-          marginRight: '15px',
-          zIndex: 1000,
-          transition: 'all 0.3s ease',
-        }}
-      >
-        Reserve
-      </Link>
-
-      {/* Mobile Menu Trigger */}
-      <button
-        ref={menuBtnRef}
-        className="mobile-nav-toggle"
-        onClick={() => setMenuOpen(!menuOpen)}
-        data-cursor={menuOpen ? 'close' : 'menu'}
-        style={{
-          display: 'none', // Managed in media query
-          background: 'none',
-          border: 'none',
-          color: 'var(--text-primary)',
-          cursor: 'pointer',
-          padding: '10px',
+          alignItems: 'center',
+          gap: '8px',
           zIndex: 1001,
         }}
       >
-        {menuOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
+        <Link
+          to="/contact"
+          className="mobile-cta-btn"
+          data-cursor="reserve"
+          style={{
+            fontFamily: "var(--sans)",
+            fontSize: '11px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            color: 'var(--bg-primary)',
+            backgroundColor: 'var(--accent-gold)',
+            padding: '8px 20px',
+            borderRadius: '30px', // Elegant pill-shaped rounded corners
+            textDecoration: 'none',
+            transition: 'all 0.3s ease',
+          }}
+        >
+          Reserve
+        </Link>
+
+        <button
+          ref={menuBtnRef}
+          className="mobile-nav-toggle"
+          onClick={() => setMenuOpen(!menuOpen)}
+          data-cursor={menuOpen ? 'close' : 'menu'}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            padding: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {menuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
 
       {/* Mobile Navigation Drawer with elegant Framer Motion animations */}
       <AnimatePresence>
