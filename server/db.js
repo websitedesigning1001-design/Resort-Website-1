@@ -608,7 +608,7 @@ function initializeTables() {
       });
       rstmt.finalize();
 
-      db.get("SELECT COUNT(*) as count FROM page_content", [], (err, row) => {
+      db.get("SELECT COUNT(*) as count FROM page_content WHERE page_id = 'home' AND section_id = 'hero' AND element_id = 'title'", [], (err, row) => {
         if (!err && row && Number(row.count) === 0) {
           const defaultPageContent = [
             // Home Page
