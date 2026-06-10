@@ -50,34 +50,38 @@ if (isPostgres) {
     return query;
   };
 
+  // Helper to extract params and callback from arguments list supporting both array and separate argument formats
+  const parseArgs = (args) => {
+    let cb;
+    if (typeof args[args.length - 1] === 'function') {
+      cb = args.pop();
+    }
+    let params = args;
+    if (args.length === 1 && Array.isArray(args[0])) {
+      params = args[0];
+    }
+    return { params, cb };
+  };
+
   db = {
-    all(sql, params, cb) {
-      if (typeof params === 'function') {
-        cb = params;
-        params = [];
-      }
+    all(sql, ...args) {
+      const { params, cb } = parseArgs(args);
       const pgSql = translateQuery(sql);
       pool.query(pgSql, params, (err, res) => {
         if (cb) cb(err, res ? res.rows : null);
       });
     },
     
-    get(sql, params, cb) {
-      if (typeof params === 'function') {
-        cb = params;
-        params = [];
-      }
+    get(sql, ...args) {
+      const { params, cb } = parseArgs(args);
       const pgSql = translateQuery(sql);
       pool.query(pgSql, params, (err, res) => {
         if (cb) cb(err, res && res.rows.length > 0 ? res.rows[0] : null);
       });
     },
     
-    run(sql, params, cb) {
-      if (typeof params === 'function') {
-        cb = params;
-        params = [];
-      }
+    run(sql, ...args) {
+      const { params, cb } = parseArgs(args);
       const pgSql = translateQuery(sql);
       pool.query(pgSql, params, function (err, res) {
         const context = {
@@ -95,11 +99,8 @@ if (isPostgres) {
     prepare(sql) {
       const pgSql = translateQuery(sql);
       return {
-        run(params, cb) {
-          if (typeof params === 'function') {
-            cb = params;
-            params = [];
-          }
+        run(...args) {
+          const { params, cb } = parseArgs(args);
           pool.query(pgSql, params, function (err, res) {
             const context = {
               lastID: res && res.rows && res.rows[0] ? res.rows[0].id : 0,
